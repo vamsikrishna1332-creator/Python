@@ -1,56 +1,55 @@
 # Mini OS Runtime (C++)
 
-This is a **starter runtime shell** written in C++ that can launch:
+This project has two deliverables:
 
-- `.exe` apps through `wine`
-- `.apk` apps through `waydroid`
-- Flatpak IDs through `flatpak run`
+1. **`mini_os` launcher** (C++) for `.exe`, `.apk`, and `flatpak:<app-id>` targets.
+2. **Bootable ISO recipe** with an interactive desktop menu and Chromium preinstalled.
 
-> Note: this is not a full operating system kernel. It is a small userspace launcher that gives one command interface to run app formats from different ecosystems.
-
-## Build
+## Build launcher
 
 ```bash
 cmake -S os_runtime -B os_runtime/build
 cmake --build os_runtime/build
 ```
 
-## Run
+Run example:
 
 ```bash
-./os_runtime/build/mini_os run game.exe
-./os_runtime/build/mini_os run mobile.apk
-./os_runtime/build/mini_os run flatpak:org.mozilla.firefox --private-window
+./os_runtime/build/mini_os run flatpak:org.mozilla.firefox
 ```
 
-## Make ISO package
+## Build bootable ISO (interactive + Chromium preinstalled)
 
-This project can also be packaged as an `.iso` image containing the launcher binary + docs.
+The bootable ISO is defined under `os_runtime/bootable_iso/` and uses **Debian live-build**.
 
 ```bash
-./os_runtime/tools/build_iso.sh
+./os_runtime/bootable_iso/build_bootable_iso.sh
 ```
 
 Output:
 
-- `os_runtime/dist/mini_os-runtime.iso`
+- `os_runtime/bootable_iso/out/mini_os_bootable.iso`
 
-Optional arguments:
+### What comes preinstalled in the ISO
+
+- Chromium browser
+- Interactive launcher (`Mini OS Control Center`) that opens automatically at login
+- Basic desktop stack (Xorg + Openbox + LightDM)
+- `wine`, `flatpak`, `waydroid`, and networking tools
+
+### Requirements for ISO build host
+
+Install live-build and ISO tools on your build machine:
 
 ```bash
-./os_runtime/tools/build_iso.sh <build_dir> <out_dir> <iso_name>
+sudo apt-get update
+sudo apt-get install -y live-build xorriso
 ```
 
-ISO builder tools accepted (auto-detected):
+## Legacy data ISO packaging
 
-- `xorriso` (preferred)
-- `genisoimage`
-- `mkisofs`
+If you only need a non-bootable ISO containing the runtime files, use:
 
-## Requirements
-
-Install tools needed for the target app type:
-
-- `wine` for `.exe`
-- `waydroid` for `.apk`
-- `flatpak` for Flatpak apps
+```bash
+./os_runtime/tools/build_iso.sh
+```

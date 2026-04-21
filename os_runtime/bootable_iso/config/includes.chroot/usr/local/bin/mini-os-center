@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+while true; do
+  CHOICE=$(zenity --list \
+    --title="Mini OS Control Center" \
+    --text="Choose an action" \
+    --column="Action" \
+    "Open Chrome" \
+    "System Settings" \
+    "Run App (mini_os)" \
+    "Terminal" \
+    "Exit" \
+    --height=360 --width=420) || exit 0
+
+  case "$CHOICE" in
+    "Open Chrome")
+      chromium --no-first-run >/dev/null 2>&1 &
+      ;;
+    "System Settings")
+      xterm -e nmtui >/dev/null 2>&1 &
+      ;;
+    "Run App (mini_os)")
+      TARGET=$(zenity --entry --title="Run App" --text="Enter target (.exe/.apk/flatpak:app.id):") || continue
+      ARGS=$(zenity --entry --title="Run App" --text="Optional args:") || true
+      # shellcheck disable=SC2086
+      xterm -e /usr/local/bin/mini_os run "$TARGET" $ARGS &
+      ;;
+    "Terminal")
+      xterm &
+      ;;
+    "Exit")
+      exit 0
+      ;;
+  esac
+done

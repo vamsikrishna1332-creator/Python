@@ -15,3 +15,9 @@ add_custom_target(iso
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     COMMENT "Packaging mini_os-runtime.iso"
 )
+
+add_custom_target(bootable-iso
+    COMMAND ${CMAKE_SOURCE_DIR}/bootable_iso/build_bootable_iso.sh
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMENT "Building bootable mini_os ISO via live-build"
+)
