@@ -1,0 +1,17 @@
+live-boot
+live-config
+systemd-sysv
+network-manager
+xorg
+openbox
+lightdm
+xinit
+xterm
+menu
+zenity
+chromium
+flatpak
+wine
+waydroid
+python3
+g++

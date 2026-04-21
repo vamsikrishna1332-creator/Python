@@ -1,0 +1,4 @@
+build/
+dist/
+bootable_iso/work/
+bootable_iso/out/

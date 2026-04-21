@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ -f /usr/local/src/mini_os/main.cpp ]]; then
+  g++ -std=c++20 -O2 /usr/local/src/mini_os/main.cpp -o /usr/local/bin/mini_os
+  chmod +x /usr/local/bin/mini_os
+fi
