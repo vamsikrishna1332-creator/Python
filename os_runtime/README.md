@@ -2,20 +2,73 @@
 
 This project has two deliverables:
 
-1. **`mini_os` launcher** (C++) for `.exe`, `.apk`, and `flatpak:<app-id>` targets.
+1. **`mini_os` launcher** (C++) for Windows (`.exe/.msi`), Android (`.apk` install + `apk:<package>` run), and `flatpak:<app-id>` targets.
 2. **Bootable ISO recipe** with an interactive desktop menu and Chromium preinstalled.
 
-## Build launcher
+## Install mini_os on Ubuntu/Debian
+
+```bash
+sudo apt-get update
+sudo apt-get install -y build-essential cmake wine flatpak
+```
+
+For Android app support, install and initialize Waydroid:
+
+```bash
+sudo apt-get install -y waydroid
+sudo waydroid init
+```
+
+Build and install `mini_os`:
 
 ```bash
 cmake -S os_runtime -B os_runtime/build
 cmake --build os_runtime/build
+sudo install -m 755 os_runtime/build/mini_os /usr/local/bin/mini_os
 ```
 
-Run example:
+Verify:
 
 ```bash
-./os_runtime/build/mini_os run flatpak:org.mozilla.firefox
+mini_os
+```
+
+## Can it install Windows and Android apps?
+
+Yes.
+
+### Install Windows apps
+
+```bash
+mini_os install setup.exe
+mini_os install installer.msi
+```
+
+### Run Windows apps
+
+```bash
+mini_os run app.exe
+```
+
+### Install Android apps (APK)
+
+```bash
+mini_os install app.apk
+```
+
+### Run installed Android apps
+
+Use the Android package name:
+
+```bash
+mini_os run apk:com.android.chrome
+```
+
+### Flatpak install/run
+
+```bash
+mini_os install flatpak:org.mozilla.firefox
+mini_os run flatpak:org.mozilla.firefox --private-window
 ```
 
 ## Build bootable ISO (interactive + Chromium preinstalled)

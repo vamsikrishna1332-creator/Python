@@ -1,4 +1,4 @@
-#include <filesystem>
+#include <cstdlib>
 #include <iostream>
 #include <optional>
 #include <sstream>
@@ -6,16 +6,22 @@
 #include <string>
 #include <vector>
 
-namespace fs = std::filesystem;
+enum class Action {
+    Run,
+    Install,
+};
 
 enum class AppKind {
     Exe,
-    Apk,
+    Msi,
+    ApkFile,
+    ApkPackage,
     FlatpakRef,
     Unknown,
 };
 
 struct LaunchRequest {
+    Action action;
     AppKind kind;
     std::string target;
     std::vector<std::string> args;
@@ -38,8 +44,14 @@ AppKind infer_kind(const std::string& target) {
     if (target.ends_with(".exe")) {
         return AppKind::Exe;
     }
+    if (target.ends_with(".msi")) {
+        return AppKind::Msi;
+    }
     if (target.ends_with(".apk")) {
-        return AppKind::Apk;
+        return AppKind::ApkFile;
+    }
+    if (target.rfind("apk:", 0) == 0) {
+        return AppKind::ApkPackage;
     }
     if (target.rfind("flatpak:", 0) == 0) {
         return AppKind::FlatpakRef;
@@ -50,13 +62,14 @@ AppKind infer_kind(const std::string& target) {
 std::string usage() {
     return
         "Usage:\n"
-        "  mini_os run <path-to.exe> [args...]\n"
-        "  mini_os run <path-to.apk> [args...]\n"
-        "  mini_os run flatpak:<app-id> [args...]\n\n"
+        "  mini_os install <setup.exe|setup.msi|app.apk|flatpak:app-id>\n"
+        "  mini_os run <app.exe|flatpak:app-id|apk:package.name> [args...]\n\n"
         "Examples:\n"
-        "  mini_os run game.exe --fullscreen\n"
-        "  mini_os run mobile.apk\n"
-        "  mini_os run flatpak:org.mozilla.firefox --private-window\n";
+        "  mini_os install setup.exe\n"
+        "  mini_os install game.msi\n"
+        "  mini_os install mobile.apk\n"
+        "  mini_os run flatpak:org.mozilla.firefox --private-window\n"
+        "  mini_os run apk:com.android.chrome\n";
 }
 
 std::optional<LaunchRequest> parse_args(int argc, char** argv) {
@@ -64,12 +77,16 @@ std::optional<LaunchRequest> parse_args(int argc, char** argv) {
         return std::nullopt;
     }
 
-    const std::string command = argv[1];
-    if (command != "run") {
+    LaunchRequest request;
+    const std::string action = argv[1];
+    if (action == "run") {
+        request.action = Action::Run;
+    } else if (action == "install") {
+        request.action = Action::Install;
+    } else {
         return std::nullopt;
     }
 
-    LaunchRequest request;
     request.target = argv[2];
     request.kind = infer_kind(request.target);
 
@@ -80,24 +97,59 @@ std::optional<LaunchRequest> parse_args(int argc, char** argv) {
     return request;
 }
 
-std::string to_shell_cmd(const LaunchRequest& request) {
+std::string build_install_cmd(const LaunchRequest& request) {
     std::ostringstream cmd;
 
     switch (request.kind) {
         case AppKind::Exe:
             cmd << "wine " << shell_escape(request.target);
             break;
-        case AppKind::Apk:
+        case AppKind::Msi:
+            cmd << "wine msiexec /i " << shell_escape(request.target);
+            break;
+        case AppKind::ApkFile:
             cmd << "waydroid app install " << shell_escape(request.target);
             break;
+        case AppKind::FlatpakRef: {
+            auto app_id = request.target.substr(std::string("flatpak:").size());
+            cmd << "flatpak install -y flathub " << shell_escape(app_id);
+            break;
+        }
+        case AppKind::ApkPackage:
+            throw std::invalid_argument(
+                "For install use an APK file path, not apk:<package>. Example: mini_os install app.apk");
+        case AppKind::Unknown:
+            throw std::invalid_argument(
+                "Unknown install target. Use .exe, .msi, .apk, or flatpak:<app-id>.");
+    }
+
+    return cmd.str();
+}
+
+std::string build_run_cmd(const LaunchRequest& request) {
+    std::ostringstream cmd;
+
+    switch (request.kind) {
+        case AppKind::Exe:
+        case AppKind::Msi:
+            cmd << "wine " << shell_escape(request.target);
+            break;
+        case AppKind::ApkPackage: {
+            auto package_name = request.target.substr(std::string("apk:").size());
+            cmd << "waydroid app launch " << shell_escape(package_name);
+            break;
+        }
         case AppKind::FlatpakRef: {
             auto app_id = request.target.substr(std::string("flatpak:").size());
             cmd << "flatpak run " << shell_escape(app_id);
             break;
         }
+        case AppKind::ApkFile:
+            throw std::invalid_argument(
+                "Running APK files directly is not supported. Install first: mini_os install app.apk, then run apk:<package>.");
         case AppKind::Unknown:
             throw std::invalid_argument(
-                "Unknown app type. Use .exe, .apk, or flatpak:<app-id>.");
+                "Unknown run target. Use .exe, flatpak:<app-id>, or apk:<package>.");
     }
 
     for (const auto& arg : request.args) {
@@ -105,6 +157,13 @@ std::string to_shell_cmd(const LaunchRequest& request) {
     }
 
     return cmd.str();
+}
+
+std::string to_shell_cmd(const LaunchRequest& request) {
+    if (request.action == Action::Install) {
+        return build_install_cmd(request);
+    }
+    return build_run_cmd(request);
 }
 
 int main(int argc, char** argv) {
@@ -116,12 +175,12 @@ int main(int argc, char** argv) {
         }
 
         std::string command = to_shell_cmd(parsed.value());
-        std::cout << "[mini_os] Launch pipeline: " << command << "\n";
+        std::cout << "[mini_os] Command: " << command << "\n";
         int rc = std::system(command.c_str());
 
         if (rc != 0) {
-            std::cerr << "[mini_os] runtime command failed with code " << rc
-                      << ". Ensure wine/waydroid/flatpak are installed.\n";
+            std::cerr << "[mini_os] command failed with code " << rc
+                      << ". Ensure wine/waydroid/flatpak are installed and configured.\n";
             return 2;
         }
 
